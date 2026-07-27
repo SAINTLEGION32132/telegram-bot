@@ -209,7 +209,6 @@ MANUAL_URLS = {
     "poland": "https://t.me/+Xy3lynB05eljN2Ux",
 }
 
-# 🌍 КАРТА СТРАН И СОКРАЩЕНИЙ ДЛЯ /profit
 COUNTRY_MAP = {
     "ro": "Румыния 🇷🇴",
     "румыния": "Румыния 🇷🇴",
@@ -402,9 +401,9 @@ def get_mentor_card_keyboard(mentor_username: str) -> InlineKeyboardMarkup:
 def get_market_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="E-sim — 13", callback_data="item_esim")],
-            [InlineKeyboardButton(text="Whatsapp — 10", callback_data="item_whatsapp")],
-            [InlineKeyboardButton(text="Proxy — 7", callback_data="item_proxy")],
+            [InlineKeyboardButton(text="E-sim — 13$", callback_data="item_esim")],
+            [InlineKeyboardButton(text="Whatsapp — 10$", callback_data="item_whatsapp")],
+            [InlineKeyboardButton(text="Proxy — 7$", callback_data="item_proxy")],
             [InlineKeyboardButton(text="« Назад", callback_data="main_menu")],
         ]
     )
@@ -503,6 +502,15 @@ def get_cashdesk_text(period: str = "all") -> str:
         f"<blockquote><b>📊 – {period_titles.get(period, 'За выбранный период:')}  ❞</b></blockquote>\n\n"
         f"• <b>Сумма:</b> {period_sum:,.0f}$\n"
         f"• <b>Количество профитов:</b> {period_count}"
+    )
+
+
+def get_info_text() -> str:
+    return (
+        f"🎡 <b>Полезная информация и ресурсы команды:</b>\n\n"
+        f"• Ознакомьтесь с материалами обучения по кнопке ниже.\n"
+        f"• Следите за выплатами в нашем специальном канале.\n\n"
+        f"<blockquote><i>По всем вопросам обращайтесь к вашему наставнику или администрации! 🚀</i></blockquote>"
     )
 
 
@@ -713,7 +721,7 @@ async def text_info_cmd(message: Message):
 
 
 # ==========================================
-# 👑 3. ВЫСТАВЛЕНИЕ ПРОФИТА (С АВТО-ЗАМЕНОЙ СТРАН ПО СОКРАЩЕНИЯМ)
+# 👑 3. ВЫСТАВЛЕНИЕ ПРОФИТА
 # ==========================================
 @dp.message(Command("profit"))
 async def add_profit_cmd(message: Message, command: CommandObject):
@@ -793,7 +801,7 @@ async def add_profit_cmd(message: Message, command: CommandObject):
 
 
 # ==========================================
-# 🔘 4. КНОПКИ И МЕНЮ
+# 🔘 4. КОМАНДЫ И ОБРАБОТЧИКИ КНОПОК МЕНЮ
 # ==========================================
 @dp.message(Command("me"))
 async def me_cmd(message: Message):
@@ -857,121 +865,79 @@ async def top_handler(callback: CallbackQuery):
     await callback.answer()
 
 
-@dp.callback_query(F.data.startswith("cash_") | (F.data == "cashdesk_all"))
+@dp.callback_query(F.data == "info_menu")
+async def info_menu_handler(callback: CallbackQuery):
+    if not is_approved(callback.from_user.id): return
+    await safe_edit_media(callback, IMAGES["info"], get_info_text(), get_info_keyboard())
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("cash_"))
 async def cashdesk_handler(callback: CallbackQuery):
     if not is_approved(callback.from_user.id): return
-    period = "all" if callback.data == "cashdesk_all" else callback.data.split("_")[1]
+    period = callback.data.split("_")[1]
     await safe_edit_media(callback, IMAGES["cashdesk"], get_cashdesk_text(period), get_cashdesk_keyboard(period))
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "cashdesk_all")
+async def cashdesk_all_handler(callback: CallbackQuery):
+    if not is_approved(callback.from_user.id): return
+    await safe_edit_media(callback, IMAGES["cashdesk"], get_cashdesk_text("all"), get_cashdesk_keyboard("all"))
     await callback.answer()
 
 
 @dp.callback_query(F.data == "mentors")
 async def mentors_handler(callback: CallbackQuery):
     if not is_approved(callback.from_user.id): return
-    user_id = callback.from_user.id
-    current_mentor = db_get_mentor(user_id)
-    
-    if current_mentor:
-        text = get_my_mentor_text(current_mentor)
-        markup = get_back_keyboard()
-    else:
-        text = get_mentors_main_text()
-        markup = get_mentors_list_keyboard()
-
-    await safe_edit_media(callback, IMAGES["mentors"], text, markup)
+    await safe_edit_media(callback, IMAGES["mentors"], get_mentors_main_text(), get_mentors_list_keyboard())
     await callback.answer()
 
 
 @dp.callback_query(F.data.startswith("mentor_view_"))
 async def mentor_view_handler(callback: CallbackQuery):
     if not is_approved(callback.from_user.id): return
-    mentor_username = callback.data.replace("mentor_view_", "")
-    text = get_mentor_card_text(mentor_username)
-    await safe_edit_media(callback, IMAGES["mentors"], text, get_mentor_card_keyboard(mentor_username))
+    mentor_username = callback.data.split("_")[2]
+    await safe_edit_media(callback, IMAGES["mentors"], get_mentor_card_text(mentor_username), get_mentor_card_keyboard(mentor_username))
     await callback.answer()
 
 
 @dp.callback_query(F.data.startswith("mentor_select_"))
 async def mentor_select_handler(callback: CallbackQuery):
     if not is_approved(callback.from_user.id): return
-    user_id = callback.from_user.id
-    mentor_username = callback.data.replace("mentor_select_", "")
-    
-    db_set_mentor(user_id, mentor_username)
-    text = get_my_mentor_text(mentor_username)
-    
-    await safe_edit_media(callback, IMAGES["mentors"], text, get_back_keyboard())
+    mentor_username = callback.data.split("_")[2]
+    db_set_mentor(callback.from_user.id, mentor_username)
     await callback.answer("✅ Вы успешно закрепились за наставником!", show_alert=True)
+    await safe_edit_media(callback, IMAGES["mentors"], get_my_mentor_text(mentor_username), get_back_keyboard())
 
 
 @dp.callback_query(F.data == "manuals")
 async def manuals_handler(callback: CallbackQuery):
     if not is_approved(callback.from_user.id): return
-    text = "🎓 <b>Выберите нужную страну для изучения мануала:</b>"
+    text = "🎓 <b>Доступные мануалы и инструкции по странам:</b>\n\nВыберите нужную страну ниже:"
     await safe_edit_media(callback, IMAGES["manuals"], text, get_manuals_keyboard())
-    await callback.answer()
-
-
-@dp.callback_query(F.data == "info_menu")
-async def info_menu_handler(callback: CallbackQuery):
-    if not is_approved(callback.from_user.id): return
-    text = "🎡 <b>Полезная информация и ссылки команды:</b>"
-    await safe_edit_media(callback, IMAGES["info"], text, get_info_keyboard())
     await callback.answer()
 
 
 @dp.callback_query(F.data == "market")
 async def market_handler(callback: CallbackQuery):
     if not is_approved(callback.from_user.id): return
-    text = "🛒 <b>Маркет товаров для работы:</b>\n\nВыберите нужную позицию:"
+    text = "🛒 <b>Маркетплейс аккаунтов и сервисов:</b>\n\nВыберите интересующий товар:"
     await safe_edit_media(callback, IMAGES["market"], text, get_market_keyboard())
     await callback.answer()
 
 
 @dp.callback_query(F.data.startswith("item_"))
-async def item_handler(callback: CallbackQuery):
+async def market_item_handler(callback: CallbackQuery):
     if not is_approved(callback.from_user.id): return
-    item_key = callback.data.replace("item_", "")
-    text = get_item_text(item_key)
-    await safe_edit_media(callback, IMAGES["market"], text, get_item_keyboard())
+    item_key = callback.data.split("_")[1]
+    await safe_edit_media(callback, IMAGES["market"], get_item_text(item_key), get_item_keyboard())
     await callback.answer()
 
 
-# ==========================================
-# 🌐 ВЕБ-СЕРВЕР ДЛЯ RENDER (АНТИ-СОН)
-# ==========================================
-async def handle_ping(request):
-    return web.Response(text="Bot is alive!")
-
-async def start_web_server():
-    app = web.Application()
-    app.router.add_get("/", handle_ping)
-    app.router.add_get("/health", handle_ping)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    port = int(os.environ.get("PORT", 8080))
-    site = web.TCPSite(runner, "0.0.0.0", port)
-    await site.start()
-
-
-# ==========================================
-# 🚀 ЗАПУСК БОТА
-# ==========================================
 async def main():
     bot = Bot(token=BOT_TOKEN)
-    
-    asyncio.create_task(start_web_server())
-    
-    try:
-        await bot.delete_webhook(drop_pending_updates=True)
-        print("--- Бот успешно запущен! ---")
-        await dp.start_polling(bot)
-    except TelegramNetworkError as e:
-        print(f"⚠️ Сетевой сбой: {e}. Перезапуск через 3 секунды...")
-        await asyncio.sleep(3)
-        await main()
-    finally:
-        await bot.session.close()
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
