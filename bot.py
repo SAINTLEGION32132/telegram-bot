@@ -2,6 +2,7 @@ import asyncio
 import logging
 import html
 import sys
+import sqlite3
 from datetime import datetime, timedelta
 from aiogram import Bot, Dispatcher, F
 from aiogram.enums import ParseMode
@@ -30,6 +31,129 @@ ADMIN_IDS = [8667346615]
 
 # 📢 ID КАНАЛА ДЛЯ ПРОФИТОВ
 PROFIT_CHANNEL_ID = -100123456789
+
+# ==========================================
+# 💾 ИНИЦИАЛИЗАЦИЯ БАЗЫ ДАННЫХ (SQLite)
+# ==========================================
+DB_NAME = "bot_database.db"
+
+def init_db():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY,
+            username TEXT,
+            approved INTEGER,
+            joined_date TEXT
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS profits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            amount REAL,
+            country TEXT,
+            mentor TEXT,
+            date TEXT
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_mentors (
+            user_id INTEGER PRIMARY KEY,
+            mentor_username TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# Функции работы с БД
+def db_get_user(user_id: int):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT approved, joined_date, username FROM users WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return {"approved": bool(row[0]), "joined_date": datetime.fromisoformat(row[1]), "username": row[2]}
+    return None
+
+def db_save_user(user_id: int, username: str, approved: bool, joined_date: datetime):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO users (user_id, username, approved, joined_date)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            username = excluded.username,
+            approved = excluded.approved
+    ''', (user_id, username, int(approved), joined_date.isoformat()))
+    conn.commit()
+    conn.close()
+
+def db_update_approval(user_id: int, approved: bool):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET approved = ?, joined_date = ? WHERE user_id = ?", 
+                   (int(approved), datetime.now().isoformat(), user_id))
+    conn.commit()
+    conn.close()
+
+def is_approved(user_id: int) -> bool:
+    if user_id in ADMIN_IDS:
+        return True
+    user = db_get_user(user_id)
+    return user.get("approved", False) if user else False
+
+def db_add_profit(username: str, amount: float, country: str, mentor: str):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO profits (username, amount, country, mentor, date)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (username, amount, country, mentor, datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+
+def db_get_all_profits():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT username, amount, country, mentor, date FROM profits")
+    rows = cursor.fetchall()
+    conn.close()
+    
+    profits = []
+    for r in rows:
+        profits.append({
+            "username": r[0],
+            "amount": r[1],
+            "country": r[2],
+            "mentor": r[3],
+            "date": datetime.fromisoformat(r[4])
+        })
+    return profits
+
+def db_set_mentor(user_id: int, mentor_username: str):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO user_mentors (user_id, mentor_username)
+        VALUES (?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET mentor_username = excluded.mentor_username
+    ''', (user_id, mentor_username))
+    conn.commit()
+    conn.close()
+
+def db_get_mentor(user_id: int):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT mentor_username FROM user_mentors WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return row[0] if row else None
+
 
 # ==========================================
 # 🖼 ССЫЛКИ И ПУТИ К КАРТИНКАМ
@@ -88,15 +212,6 @@ COUNTRY_FLAGS = {
     "испания": "🇪🇸", "великобритания": "🇬🇧", "англия": "🇬🇧", "польша": "🇵🇱",
 }
 
-# ==========================================
-# 💾 ДИНАМИЧЕСКАЯ БАЗА ДАННЫХ
-# ==========================================
-PROFITS_DB = []
-USER_MENTORS = {}
-
-# user_id: {"approved": bool, "joined_date": datetime, "username": str}
-USERS_DB = {}
-
 MENTORS_DATA = {
     "aIadin_work": {"username": "aIadin_work", "percent": "15%", "description": "Профессиональный наставник"},
     "qwertyygod": {"username": "qwertyygod", "percent": "15%", "description": "Профессиональный наставник"}
@@ -106,16 +221,11 @@ MENTORS_DATA = {
 # ==========================================
 # 📐 ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 # ==========================================
-def is_approved(user_id: int) -> bool:
-    if user_id in ADMIN_IDS:
-        return True
-    return USERS_DB.get(user_id, {}).get("approved", False)
-
-
 def filter_profits_by_period(period: str):
     now = datetime.now()
+    profits_db = db_get_all_profits()
     filtered = []
-    for p in PROFITS_DB:
+    for p in profits_db:
         p_date = p["date"]
         if period == "day" and p_date.date() == now.date():
             filtered.append(p)
@@ -149,9 +259,15 @@ def get_top_workers(period: str = "all", limit: int = 10):
 
 
 def get_mentor_stats(mentor_username: str):
-    students_ids = [uid for uid, m_name in USER_MENTORS.items() if m_name.lower() == mentor_username.lower()]
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id FROM user_mentors WHERE LOWER(mentor_username) = ?", (mentor_username.lower(),))
+    students_ids = cursor.fetchall()
+    conn.close()
     students_count = len(students_ids)
-    mentor_profits = [p for p in PROFITS_DB if p.get("mentor", "").lower() == mentor_username.lower()]
+
+    profits_db = db_get_all_profits()
+    mentor_profits = [p for p in profits_db if p.get("mentor", "").lower() == mentor_username.lower()]
     total_sum = sum(p["amount"] for p in mentor_profits)
     profits_count = len(mentor_profits)
     return students_count, profits_count, total_sum
@@ -294,7 +410,12 @@ def get_item_keyboard() -> InlineKeyboardMarkup:
 # ==========================================
 def get_main_text(username: str) -> str:
     total_sum, _ = get_stats_for_period("all")
-    workers_count = len([u for u, d in USERS_DB.items() if d.get("approved")])
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM users WHERE approved = 1")
+    workers_count = cursor.fetchone()[0]
+    conn.close()
+    
     return (
         f"🎯<b>Добро пожаловать, воркер @{username}!</b>\n\n"
         f"• <b>Выплачено всего:</b> <code>{total_sum:,.2f}$</code>\n"
@@ -305,14 +426,16 @@ def get_main_text(username: str) -> str:
 
 
 def get_profile_text(user_id: int, username: str) -> str:
-    user_profits = [p for p in PROFITS_DB if p["username"].lower() == username.lower()]
+    profits_db = db_get_all_profits()
+    user_profits = [p for p in profits_db if p["username"].lower() == username.lower()]
     now = datetime.now()
     day_sum = sum(p["amount"] for p in user_profits if p["date"].date() == now.date())
     month_sum = sum(p["amount"] for p in user_profits if p["date"] >= (now - timedelta(days=30)))
     total_sum = sum(p["amount"] for p in user_profits)
     count = len(user_profits)
 
-    joined_date = USERS_DB.get(user_id, {}).get("joined_date", datetime.now())
+    user_data = db_get_user(user_id)
+    joined_date = user_data.get("joined_date", datetime.now()) if user_data else datetime.now()
     days_in_team = (datetime.now() - joined_date).days
 
     return (
@@ -438,14 +561,11 @@ async def start_cmd(message: Message):
     raw_name = message.from_user.username or message.from_user.first_name
     username = html.escape(raw_name)
 
-    if user_id not in USERS_DB:
-        USERS_DB[user_id] = {
-            "approved": False,
-            "joined_date": datetime.now(),
-            "username": message.from_user.username or ""
-        }
+    user_data = db_get_user(user_id)
+    if not user_data:
+        db_save_user(user_id, message.from_user.username or "", False, datetime.now())
     else:
-        USERS_DB[user_id]["username"] = message.from_user.username or ""
+        db_save_user(user_id, message.from_user.username or "", user_data["approved"], user_data["joined_date"])
 
     if not is_approved(user_id):
         await message.answer("⏳ <b>Ваша заявка отправлена администраторам. Ожидайте подтверждения!</b>",
@@ -488,19 +608,17 @@ async def approve_user_cmd(callback: CallbackQuery):
     if callback.from_user.id not in ADMIN_IDS:
         return
     user_id = int(callback.data.split("_")[1])
-    if user_id in USERS_DB:
-        USERS_DB[user_id]["approved"] = True
-        USERS_DB[user_id]["joined_date"] = datetime.now()
+    db_update_approval(user_id, True)
 
-        try:
-            await callback.bot.send_message(user_id,
-                                            " <b>Ваша заявка одобрена! Напишите /start для входа в меню.</b>",
-                                            parse_mode=ParseMode.HTML)
-        except Exception:
-            pass
+    try:
+        await callback.bot.send_message(user_id,
+                                        "✅ <b>Ваша заявка одобрена! Напишите /start для входа в меню.</b>",
+                                        parse_mode=ParseMode.HTML)
+    except Exception:
+        pass
 
-        await callback.message.edit_text(f"✅ Пользователь <code>{user_id}</code> успешно подтвержден!",
-                                         parse_mode=ParseMode.HTML)
+    await callback.message.edit_text(f"✅ Пользователь <code>{user_id}</code> успешно подтвержден!",
+                                   parse_mode=ParseMode.HTML)
     await callback.answer()
 
 
@@ -509,14 +627,13 @@ async def reject_user_cmd(callback: CallbackQuery):
     if callback.from_user.id not in ADMIN_IDS:
         return
     user_id = int(callback.data.split("_")[1])
-    if user_id in USERS_DB:
-        try:
-            await callback.bot.send_message(user_id, "❌ <b>Ваша заявка на доступ была отклонена.</b>",
-                                            parse_mode=ParseMode.HTML)
-        except Exception:
-            pass
-        await callback.message.edit_text(f"❌ Заявка пользователя <code>{user_id}</code> отклонена.",
-                                         parse_mode=ParseMode.HTML)
+    try:
+        await callback.bot.send_message(user_id, "❌ <b>Ваша заявка на доступ была отклонена.</b>",
+                                        parse_mode=ParseMode.HTML)
+    except Exception:
+        pass
+    await callback.message.edit_text(f"❌ Заявка пользователя <code>{user_id}</code> отклонена.",
+                                   parse_mode=ParseMode.HTML)
     await callback.answer()
 
 
@@ -532,35 +649,39 @@ async def text_info_cmd(message: Message):
 
     args = message.text.split()
 
-    # Ищем пользователя, чей юзернейм передали
     if len(args) > 1:
         target_username = args[1].replace("@", "").strip()
         target_user_id = None
-        for uid, udata in USERS_DB.items():
-            if udata.get("username", "").lower() == target_username.lower():
-                target_user_id = uid
-                break
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id FROM users WHERE LOWER(username) = ?", (target_username.lower(),))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            target_user_id = row[0]
     else:
         target_username = message.from_user.username or message.from_user.first_name
         target_user_id = user_id
 
     clean_username = html.escape(target_username)
 
-    user_profits = [p for p in PROFITS_DB if p["username"].lower() == target_username.lower()]
+    profits_db = db_get_all_profits()
+    user_profits = [p for p in profits_db if p["username"].lower() == target_username.lower()]
     total_sum = sum(p["amount"] for p in user_profits)
     count = len(user_profits)
 
-    if target_user_id and target_user_id in USERS_DB:
+    target_data = db_get_user(target_user_id) if target_user_id else None
+    if target_data:
         user_id_text = f"<code>{target_user_id}</code>"
-        joined_date = USERS_DB[target_user_id].get("joined_date", datetime.now())
+        joined_date = target_data.get("joined_date", datetime.now())
         days_in_team = (datetime.now() - joined_date).days
         days_text = f"{days_in_team} дн."
     else:
         user_id_text = "<i>Не найден</i>"
         days_text = "<i>Нет данных</i>"
 
-    mentor = USER_MENTORS.get(target_user_id, "Не выбран") if target_user_id else "Не выбран"
-    mentor_text = f"@{mentor}" if mentor != "Не выбран" else "Не выбран"
+    mentor = db_get_mentor(target_user_id) if target_user_id else None
+    mentor_text = f"@{mentor}" if mentor else "Не выбран"
 
     text = (
         f"📊 <b>Информация о воркере @{clean_username}:</b>\n\n"
@@ -596,17 +717,17 @@ async def add_profit_cmd(message: Message, command: CommandObject):
         flag = COUNTRY_FLAGS.get(country_name.lower(), "🌐")
         country_with_flag = f"{country_name.capitalize()} {flag}"
 
+        # Ищем наставника воркера в БД
         assigned_mentor = ""
-        for uid, m_name in USER_MENTORS.items():
-            assigned_mentor = m_name
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute("SELECT u.user_id, um.mentor_username FROM users u JOIN user_mentors um ON u.user_id = um.user_id WHERE LOWER(u.username) = ?", (raw_user.lower(),))
+        row = cursor.fetchone()
+        if row:
+            assigned_mentor = row[1]
+        conn.close()
 
-        PROFITS_DB.append({
-            "username": raw_user,
-            "amount": amount,
-            "country": country_name,
-            "mentor": assigned_mentor,
-            "date": datetime.now()
-        })
+        db_add_profit(raw_user, amount, country_name, assigned_mentor)
 
         bot_info = await message.bot.get_me()
         bot_username = bot_info.username
@@ -731,8 +852,8 @@ async def cashdesk_handler(callback: CallbackQuery):
 async def mentors_handler(callback: CallbackQuery):
     if not is_approved(callback.from_user.id): return
     user_id = callback.from_user.id
-    if user_id in USER_MENTORS:
-        mentor_name = USER_MENTORS[user_id]
+    mentor_name = db_get_mentor(user_id)
+    if mentor_name:
         text = get_my_mentor_text(mentor_name)
         await safe_edit_media(callback, IMAGES["mentors"], text, get_back_keyboard())
     else:
@@ -755,7 +876,7 @@ async def mentor_select_handler(callback: CallbackQuery):
     if not is_approved(callback.from_user.id): return
     mentor_username = callback.data.replace("mentor_select_", "")
     user_id = callback.from_user.id
-    USER_MENTORS[user_id] = mentor_username
+    db_set_mentor(user_id, mentor_username)
     text = f"✅ <b>Вы успешно закреплены за @{mentor_username}!</b>"
     await safe_edit_media(callback, IMAGES["mentors"], text, get_back_keyboard())
     await callback.answer()
