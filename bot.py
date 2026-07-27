@@ -528,8 +528,8 @@ def get_mentors_main_text() -> str:
     return (
         f"🎓<b>Всем привет, если кто новичок и ничего не понимает что и как делать, "
         f"то берите одного из наставников, они вас доведут до первого депозита меньше чем за 3 дня.</b>\n\n"
-        f"<blockquote><i>🤝 @aIadin_work 15%  ❞\n"
-        f"🤝 @qwertyygod 15%</i></blockquote>\n\n"
+        f"<blockquote><i>🤝 @aIadin_work 25%  ❞\n"
+        f"🤝 @qwertyygod 25%</i></blockquote>\n\n"
         f"‼️ <b>Пишите только одному наставнику, всем не спамьте</b> ‼️"
     )
 
