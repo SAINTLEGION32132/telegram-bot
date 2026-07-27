@@ -32,7 +32,7 @@ BOT_TOKEN = "8725774318:AAFeU98t4669xvRf21eeUmxAqyog-ExM0Fo"
 ADMIN_IDS = [8667346615]
 
 # 📢 ID КАНАЛА ДЛЯ ПРОФИТОВ
-PROFIT_CHANNEL_ID = -100123456789
+PROFIT_CHANNEL_ID = -1003352853772
 
 # ==========================================
 # 💾 ИНИЦИАЛИЗАЦИЯ БАЗЫ ДАННЫХ (SQLite)
