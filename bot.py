@@ -209,9 +209,21 @@ MANUAL_URLS = {
     "poland": "https://t.me/+Xy3lynB05eljN2Ux",
 }
 
-COUNTRY_FLAGS = {
-    "румыния": "🇷🇴", "болгария": "🇧🇬", "португалия": "🇵🇹",
-    "испания": "🇪🇸", "великобритания": "🇬🇧", "англия": "🇬🇧", "польша": "🇵🇱",
+# 🌍 КАРТА СТРАН И СОКРАЩЕНИЙ ДЛЯ /profit
+COUNTRY_MAP = {
+    "ro": "Румыния 🇷🇴",
+    "румыния": "Румыния 🇷🇴",
+    "bg": "Болгария 🇧🇬",
+    "болгария": "Болгария 🇧🇬",
+    "pt": "Португалия 🇵🇹",
+    "португалия": "Португалия 🇵🇹",
+    "es": "Испания 🇪🇸",
+    "испания": "Испания 🇪🇸",
+    "uk": "Великобритания 🇬🇧",
+    "британия": "Великобритания 🇬🇧",
+    "великобритания": "Великобритания 🇬🇧",
+    "pl": "Польша 🇵🇱",
+    "польша": "Польша 🇵🇱",
 }
 
 MENTORS_DATA = {
@@ -701,7 +713,7 @@ async def text_info_cmd(message: Message):
 
 
 # ==========================================
-# 👑 3. ВЫСТАВЛЕНИЕ ПРОФИТА
+# 👑 3. ВЫСТАВЛЕНИЕ ПРОФИТА (С АВТО-ЗАМЕНОЙ СТРАН ПО СОКРАЩЕНИЯМ)
 # ==========================================
 @dp.message(Command("profit"))
 async def add_profit_cmd(message: Message, command: CommandObject):
@@ -709,7 +721,7 @@ async def add_profit_cmd(message: Message, command: CommandObject):
         return
 
     if not command.args:
-        await message.answer("⚠️ <b>Использование:</b> <code>/profit @username 100 Болгария</code>",
+        await message.answer("⚠️ <b>Использование:</b> <code>/profit @username 100 bg</code> (или Болгария)",
                              parse_mode=ParseMode.HTML)
         return
 
@@ -717,11 +729,17 @@ async def add_profit_cmd(message: Message, command: CommandObject):
         args = command.args.split()
         raw_user = args[0].replace("@", "")
         amount = float(args[1].replace("$", ""))
-        country_name = " ".join(args[2:]) if len(args) > 2 else "Не указана"
+        
+        # Обработка страны: берем аргумент, приводим к нижнему регистру для сверки со словарем
+        raw_country_input = " ".join(args[2:]).lower().strip() if len(args) > 2 else ""
+        
+        # Подставляем красивое название и флаг из словаря, либо оставляем исходное с заглавной буквы
+        country_with_flag = COUNTRY_MAP.get(raw_country_input, f"{raw_country_input.capitalize()} 🌐" if raw_country_input else "Не указана 🌐")
+        
+        # Чистое название для базы данных (без флага)
+        clean_country_db = country_with_flag.split(" ")[0]
 
         worker_share = amount * 0.75
-        flag = COUNTRY_FLAGS.get(country_name.lower(), "🌐")
-        country_with_flag = f"{country_name.capitalize()} {flag}"
 
         assigned_mentor = ""
         conn = sqlite3.connect(DB_NAME)
@@ -732,7 +750,7 @@ async def add_profit_cmd(message: Message, command: CommandObject):
             assigned_mentor = row[1]
         conn.close()
 
-        db_add_profit(raw_user, amount, country_name, assigned_mentor)
+        db_add_profit(raw_user, amount, clean_country_db, assigned_mentor)
 
         bot_info = await message.bot.get_me()
         bot_username = bot_info.username
@@ -776,7 +794,7 @@ async def add_profit_cmd(message: Message, command: CommandObject):
                                      parse_mode=ParseMode.HTML)
 
     except Exception:
-        await message.answer("❌ <b>Ошибка ввода!</b> Пример: <code>/profit @username 100 Болгария</code>",
+        await message.answer("❌ <b>Ошибка ввода!</b> Пример: <code>/profit @username 100 bg</code>",
                              parse_mode=ParseMode.HTML)
 
 
