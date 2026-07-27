@@ -321,12 +321,12 @@ def get_profile_text(user_id: int, username: str) -> str:
         f"• <b>Имя: @{username}</b>\n"
         f"• <b>Профитов:</b> {count}\n\n"
         f" ⌄ <b>Информация о профитах:</b>\n"
-        f"• <b>День:</b><code> ${day_sum:,.2f}</code>\n"
-        f"• <b>Месяц:</b><code> ${month_sum:,.2f}</code>\n"
-        f"• <b>Всего:</b><code> ${total_sum:,.2f}</code>\n\n"
+        f"• <b>День:</b><code> ${day_sum:,.2f} </code>\n"
+        f"• <b>Месяц:</b><code> ${month_sum:,.2f} </code>\n"
+        f"• <b>Всего:</b><code> ${total_sum:,.2f} </code>\n\n"
         f"❗️› <b>Дополнительная информация:</b>\n"
         f"• <b>Место в топе: Не в топе</b>\n"
-        f"• <b>В тиме: {days_in_team}д</b>"
+        f"• <b>В тиме: {days_in_team} д</b>"
     )
 
 
