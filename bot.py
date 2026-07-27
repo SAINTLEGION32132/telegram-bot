@@ -757,12 +757,12 @@ async def add_profit_cmd(message: Message, command: CommandObject):
 
         caption = (
             f"<b>- PROFIT / УСПЕШНАЯ ОПЕРАЦИЯ</b>\n\n"
-            f"├ <b>Воркер:</b> @{raw_user}\n"
+            f"├ <b>Воркер: @{raw_user}</b>\n"
             f"├ <b>Сумма:</b> <code>{amount:,.0f}$</code>\n"
             f"├ <b>Доля воркера:</b> <code>{worker_share:,.2f}$</code>\n"
-            f"└ <b>Страна:</b> {country_with_flag}\n\n"
-            f"🏛 <b>Проект:</b>\n"
-            f"@{bot_username}"
+            f"└ <b>Страна: {country_with_flag}</b>\n\n"
+            f"🏛 <b>Проект:\n"
+            f"@{bot_username}</b>"
         )
 
         inline_kb = InlineKeyboardMarkup(
