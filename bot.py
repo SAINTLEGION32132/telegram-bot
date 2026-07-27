@@ -478,7 +478,7 @@ def get_top_text(period: str = "day") -> str:
 
     text = f"— 🏆 <b>Топ воркеров {period_names.get(period, '')}:</b>\n\n"
     if not top_list:
-        text += "<i>Список пока пуст... Стань первым!</i>\n\n"
+        text += "<b>Список пока пуст... Стань первым!</b>\n\n"
     else:
         medals = ["🥇", "🥈", "🥉"]
         for idx, (uname, stats) in enumerate(top_list):
