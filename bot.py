@@ -756,7 +756,6 @@ async def add_profit_cmd(message: Message, command: CommandObject):
         bot_username = bot_info.username
 
         caption = (
-            f"<b>PAYS | SAINT LEGION 💰</b>\n\n"
             f"<b>- PROFIT / УСПЕШНАЯ ОПЕРАЦИЯ</b>\n\n"
             f"├ <b>Воркер:</b> @{raw_user}\n"
             f"├ <b>Сумма:</b> <code>{amount:,.0f}$</code>\n"
