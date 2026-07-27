@@ -31,8 +31,8 @@ BOT_TOKEN = "8725774318:AAFeU98t4669xvRf21eeUmxAqyog-ExM0Fo"
 # 👑 ID Администраторов
 ADMIN_IDS = [8667346615]
 
-# 📢 ID КАНАЛА ДЛЯ ПРОФИТОВ
-PROFIT_CHANNEL_ID = -1003352853772
+# 📢 ID КАНАЛА ДЛЯ ПРОФИТОВ (обязательно добавь бота в админы канала с правом публикации)
+PROFIT_CHANNEL_ID = -100123456789
 
 # ==========================================
 # 💾 ИНИЦИАЛИЗАЦИЯ БАЗЫ ДАННЫХ (SQLite)
@@ -730,13 +730,8 @@ async def add_profit_cmd(message: Message, command: CommandObject):
         raw_user = args[0].replace("@", "")
         amount = float(args[1].replace("$", ""))
         
-        # Обработка страны: берем аргумент, приводим к нижнему регистру для сверки со словарем
         raw_country_input = " ".join(args[2:]).lower().strip() if len(args) > 2 else ""
-        
-        # Подставляем красивое название и флаг из словаря, либо оставляем исходное с заглавной буквы
         country_with_flag = COUNTRY_MAP.get(raw_country_input, f"{raw_country_input.capitalize()} 🌐" if raw_country_input else "Не указана 🌐")
-        
-        # Чистое название для базы данных (без флага)
         clean_country_db = country_with_flag.split(" ")[0]
 
         worker_share = amount * 0.75
@@ -756,13 +751,14 @@ async def add_profit_cmd(message: Message, command: CommandObject):
         bot_username = bot_info.username
 
         caption = (
+            f"<b>PAYS | SAINT LEGION 💰</b>\n\n"
             f"<b>- PROFIT / УСПЕШНАЯ ОПЕРАЦИЯ</b>\n\n"
-            f"├ <b>Воркер: @{raw_user}</b>\n"
+            f"├ <b>Воркер:</b> @{raw_user}\n"
             f"├ <b>Сумма:</b> <code>{amount:,.0f}$</code>\n"
             f"├ <b>Доля воркера:</b> <code>{worker_share:,.2f}$</code>\n"
-            f"└ <b>Страна: {country_with_flag}</b>\n\n"
-            f"🏛 <b>Проект:\n"
-            f"@{bot_username}</b>"
+            f"└ <b>Страна:</b> {country_with_flag}\n\n"
+            f"🏛 <b>Проект:</b>\n"
+            f"@{bot_username}"
         )
 
         inline_kb = InlineKeyboardMarkup(
@@ -965,7 +961,6 @@ async def start_web_server():
 async def main():
     bot = Bot(token=BOT_TOKEN)
     
-    # Запускаем локальный веб-сервер в фоне для UptimeRobot / Render
     asyncio.create_task(start_web_server())
     
     try:
