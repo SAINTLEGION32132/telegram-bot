@@ -483,7 +483,7 @@ def get_top_text(period: str = "day") -> str:
         medals = ["🥇", "🥈", "🥉"]
         for idx, (uname, stats) in enumerate(top_list):
             icon = medals[idx] if idx < 3 else "🕴️"
-            text += f"{icon} @{uname} ✕ {stats['sum']:,.0f}$ ✕ {stats['count']} профитов\n"
+            text += f"<b>{icon} @{uname} ✕ {stats['sum']:,.0f}$ ✕ {stats['count']} профитов</b>\n"
         text += "\n"
 
     text += f"— 💼 <b>Общая касса за все время: {total_all:,.0f}$</b>"
