@@ -18,6 +18,7 @@ from aiogram.types import (
     FSInputFile,
 )
 from aiogram.exceptions import TelegramBadRequest, TelegramNetworkError
+from aiogram.client.session.aiohttp import AiohttpSession
 
 # 🛠 ФИКС ДЛЯ WINDOWS (Убирает WinError 121 / Semaphore Timeout)
 if sys.platform == 'win32':
@@ -38,6 +39,7 @@ PROFIT_CHANNEL_ID = -1003352853772
 # 💾 ИНИЦИАЛИЗАЦИЯ БАЗЫ ДАННЫХ (SQLite)
 # ==========================================
 DB_NAME = "bot_database.db"
+
 
 def init_db():
     conn = sqlite3.connect(DB_NAME)
@@ -69,7 +71,9 @@ def init_db():
     conn.commit()
     conn.close()
 
+
 init_db()
+
 
 # Функции работы с БД
 def db_get_user(user_id: int):
@@ -81,6 +85,7 @@ def db_get_user(user_id: int):
     if row:
         return {"approved": bool(row[0]), "joined_date": datetime.fromisoformat(row[1]), "username": row[2]}
     return None
+
 
 def db_save_user(user_id: int, username: str, approved: bool, joined_date: datetime):
     conn = sqlite3.connect(DB_NAME)
@@ -95,19 +100,22 @@ def db_save_user(user_id: int, username: str, approved: bool, joined_date: datet
     conn.commit()
     conn.close()
 
+
 def db_update_approval(user_id: int, approved: bool):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("UPDATE users SET approved = ?, joined_date = ? WHERE user_id = ?", 
+    cursor.execute("UPDATE users SET approved = ?, joined_date = ? WHERE user_id = ?",
                    (int(approved), datetime.now().isoformat(), user_id))
     conn.commit()
     conn.close()
+
 
 def is_approved(user_id: int) -> bool:
     if user_id in ADMIN_IDS:
         return True
     user = db_get_user(user_id)
     return user.get("approved", False) if user else False
+
 
 def db_add_profit(username: str, amount: float, country: str, mentor: str):
     conn = sqlite3.connect(DB_NAME)
@@ -119,13 +127,14 @@ def db_add_profit(username: str, amount: float, country: str, mentor: str):
     conn.commit()
     conn.close()
 
+
 def db_get_all_profits():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("SELECT username, amount, country, mentor, date FROM profits")
     rows = cursor.fetchall()
     conn.close()
-    
+
     profits = []
     for r in rows:
         profits.append({
@@ -137,6 +146,7 @@ def db_get_all_profits():
         })
     return profits
 
+
 def db_set_mentor(user_id: int, mentor_username: str):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -147,6 +157,7 @@ def db_set_mentor(user_id: int, mentor_username: str):
     ''', (user_id, mentor_username))
     conn.commit()
     conn.close()
+
 
 def db_get_mentor(user_id: int):
     conn = sqlite3.connect(DB_NAME)
@@ -392,7 +403,7 @@ def get_mentor_card_keyboard(mentor_username: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="📌 Закрепиться за этим наставником",
-                                 callback_data=f"mentor_select_{mentor_username}")],
+                                  callback_data=f"mentor_select_{mentor_username}")],
             [InlineKeyboardButton(text="« Назад", callback_data="mentors")],
         ]
     )
@@ -428,7 +439,7 @@ def get_main_text(username: str) -> str:
     cursor.execute("SELECT COUNT(*) FROM users WHERE approved = 1")
     workers_count = cursor.fetchone()[0]
     conn.close()
-    
+
     return (
         f"🎯<b>Добро пожаловать, воркер @{username}!</b>\n\n"
         f"• <b>Выплачено всего:</b> <code>{total_sum:,.2f}$</code>\n"
@@ -654,7 +665,7 @@ async def approve_user_cmd(callback: CallbackQuery):
         pass
 
     await callback.message.edit_text(f"✅ Пользователь <code>{user_id}</code> успешно подтвержден!",
-                                   parse_mode=ParseMode.HTML)
+                                     parse_mode=ParseMode.HTML)
     await callback.answer()
 
 
@@ -669,7 +680,7 @@ async def reject_user_cmd(callback: CallbackQuery):
     except Exception:
         pass
     await callback.message.edit_text(f"❌ Заявка пользователя <code>{user_id}</code> отклонена.",
-                                   parse_mode=ParseMode.HTML)
+                                     parse_mode=ParseMode.HTML)
     await callback.answer()
 
 
@@ -747,9 +758,10 @@ async def add_profit_cmd(message: Message, command: CommandObject):
         args = command.args.split()
         raw_user = args[0].replace("@", "")
         amount = float(args[1].replace("$", ""))
-        
+
         raw_country_input = " ".join(args[2:]).lower().strip() if len(args) > 2 else ""
-        country_with_flag = COUNTRY_MAP.get(raw_country_input, f"{raw_country_input.capitalize()} 🌐" if raw_country_input else "Не указана 🌐")
+        country_with_flag = COUNTRY_MAP.get(raw_country_input,
+                                            f"{raw_country_input.capitalize()} 🌐" if raw_country_input else "Не указана 🌐")
         clean_country_db = country_with_flag.split(" ")[0]
 
         worker_share = amount * 0.75
@@ -757,7 +769,9 @@ async def add_profit_cmd(message: Message, command: CommandObject):
         assigned_mentor = ""
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
-        cursor.execute("SELECT u.user_id, um.mentor_username FROM users u JOIN user_mentors um ON u.user_id = um.user_id WHERE LOWER(u.username) = ?", (raw_user.lower(),))
+        cursor.execute(
+            "SELECT u.user_id, um.mentor_username FROM users u JOIN user_mentors um ON u.user_id = um.user_id WHERE LOWER(u.username) = ?",
+            (raw_user.lower(),))
         row = cursor.fetchone()
         if row:
             assigned_mentor = row[1]
@@ -858,7 +872,7 @@ async def back_to_main(callback: CallbackQuery):
 
 
 @dp.callback_query(F.data == "profile")
-async def profile_handler(callback: CallbackQuery):
+async def profile_callback(callback: CallbackQuery):
     if not is_approved(callback.from_user.id): return
     raw_name = callback.from_user.username or callback.from_user.first_name
     username = html.escape(raw_name)
@@ -868,86 +882,121 @@ async def profile_handler(callback: CallbackQuery):
 
 
 @dp.callback_query(F.data.startswith("top_"))
-async def top_handler(callback: CallbackQuery):
+async def top_callback(callback: CallbackQuery):
     if not is_approved(callback.from_user.id): return
     period = callback.data.split("_")[1]
-    await safe_edit_media(callback, IMAGES["top"], get_top_text(period), get_top_keyboard(period))
+    text = get_top_text(period)
+    await safe_edit_media(callback, IMAGES["top"], text, get_top_keyboard(period))
     await callback.answer()
 
 
 @dp.callback_query(F.data == "info_menu")
-async def info_menu_handler(callback: CallbackQuery):
+async def info_callback(callback: CallbackQuery):
     if not is_approved(callback.from_user.id): return
-    await safe_edit_media(callback, IMAGES["info"], get_info_text(), get_info_keyboard())
+    text = get_info_text()
+    await safe_edit_media(callback, IMAGES["info"], text, get_info_keyboard())
     await callback.answer()
 
 
-@dp.callback_query(F.data.startswith("cash_"))
-async def cashdesk_handler(callback: CallbackQuery):
+@dp.callback_query(F.data.startswith("cash_") | F.data.startswith("cashdesk_"))
+async def cashdesk_callback(callback: CallbackQuery):
     if not is_approved(callback.from_user.id): return
-    period = callback.data.split("_")[1]
-    await safe_edit_media(callback, IMAGES["cashdesk"], get_cashdesk_text(period), get_cashdesk_keyboard(period))
-    await callback.answer()
-
-
-@dp.callback_query(F.data == "cashdesk_all")
-async def cashdesk_all_handler(callback: CallbackQuery):
-    if not is_approved(callback.from_user.id): return
-    await safe_edit_media(callback, IMAGES["cashdesk"], get_cashdesk_text("all"), get_cashdesk_keyboard("all"))
+    parts = callback.data.split("_")
+    period = parts[1] if len(parts) > 1 else "all"
+    text = get_cashdesk_text(period)
+    await safe_edit_media(callback, IMAGES["cashdesk"], text, get_cashdesk_keyboard(period))
     await callback.answer()
 
 
 @dp.callback_query(F.data == "mentors")
-async def mentors_handler(callback: CallbackQuery):
+async def mentors_callback(callback: CallbackQuery):
     if not is_approved(callback.from_user.id): return
-    await safe_edit_media(callback, IMAGES["mentors"], get_mentors_main_text(), get_mentors_list_keyboard())
+    text = get_mentors_main_text()
+    await safe_edit_media(callback, IMAGES["mentors"], text, get_mentors_list_keyboard())
     await callback.answer()
 
 
 @dp.callback_query(F.data.startswith("mentor_view_"))
-async def mentor_view_handler(callback: CallbackQuery):
+async def mentor_view_callback(callback: CallbackQuery):
     if not is_approved(callback.from_user.id): return
-    mentor_username = callback.data.split("_")[2]
-    await safe_edit_media(callback, IMAGES["mentors"], get_mentor_card_text(mentor_username), get_mentor_card_keyboard(mentor_username))
+    mentor_username = callback.data.replace("mentor_view_", "")
+    text = get_mentor_card_text(mentor_username)
+    await safe_edit_media(callback, IMAGES["mentors"], text, get_mentor_card_keyboard(mentor_username))
     await callback.answer()
 
 
 @dp.callback_query(F.data.startswith("mentor_select_"))
-async def mentor_select_handler(callback: CallbackQuery):
+async def mentor_select_callback(callback: CallbackQuery):
     if not is_approved(callback.from_user.id): return
-    mentor_username = callback.data.split("_")[2]
-    db_set_mentor(callback.from_user.id, mentor_username)
-    await callback.answer("✅ Вы успешно закрепились за наставником!", show_alert=True)
-    await safe_edit_media(callback, IMAGES["mentors"], get_my_mentor_text(mentor_username), get_back_keyboard())
+    mentor_username = callback.data.replace("mentor_select_", "")
+    user_id = callback.from_user.id
+
+    current_mentor = db_get_mentor(user_id)
+    if current_mentor:
+        await callback.answer("❌ Вы уже выбрали наставника ранее!", show_alert=True)
+        return
+
+    db_set_mentor(user_id, mentor_username)
+    text = get_my_mentor_text(mentor_username)
+    await safe_edit_media(callback, IMAGES["mentors"], text, get_back_keyboard())
+    await callback.answer("✅ Вы успешно выбрали наставника!", show_alert=True)
 
 
 @dp.callback_query(F.data == "manuals")
-async def manuals_handler(callback: CallbackQuery):
+async def manuals_callback(callback: CallbackQuery):
     if not is_approved(callback.from_user.id): return
-    text = "🎓 <b>Доступные мануалы и инструкции по странам:</b>\n\nВыберите нужную страну ниже:"
+    text = "🎓 <b>Выберите страну для изучения мануала:</b>"
     await safe_edit_media(callback, IMAGES["manuals"], text, get_manuals_keyboard())
     await callback.answer()
 
 
 @dp.callback_query(F.data == "market")
-async def market_handler(callback: CallbackQuery):
+async def market_callback(callback: CallbackQuery):
     if not is_approved(callback.from_user.id): return
-    text = "🛒 <b>Маркетплейс аккаунтов и сервисов:</b>\n\nВыберите интересующий товар:"
+    text = "🛒 <b>Маркет товаров и услуг:</b>\n\nВыберите нужный товар ниже:"
     await safe_edit_media(callback, IMAGES["market"], text, get_market_keyboard())
     await callback.answer()
 
 
 @dp.callback_query(F.data.startswith("item_"))
-async def market_item_handler(callback: CallbackQuery):
+async def item_callback(callback: CallbackQuery):
     if not is_approved(callback.from_user.id): return
-    item_key = callback.data.split("_")[1]
-    await safe_edit_media(callback, IMAGES["market"], get_item_text(item_key), get_item_keyboard())
+    item_key = callback.data.replace("item_", "")
+    text = get_item_text(item_key)
+    await safe_edit_media(callback, IMAGES["market"], text, get_item_keyboard())
     await callback.answer()
 
 
+# ==========================================
+# 🚀 ЗАПУСК БОТА
+# ==========================================
+async def dummy_web_server(request):
+    return web.Response(text="Bot is running!")
+
+
+async def start_web_server():
+    app = web.Application()
+    app.router.add_get("/", dummy_web_server)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.environ.get("PORT", 8080))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+
+
 async def main():
-    bot = Bot(token=BOT_TOKEN)
+    await start_web_server()
+    logging.info("Бот запущен и готов к работе!")
+
+    # Правильный способ настройки таймаута через сессию aiogram
+    session = AiohttpSession(timeout=30)
+    bot = Bot(token=BOT_TOKEN, session=session)
+
     await dp.start_polling(bot)
 
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        logging.info("Бот остановлен!")
