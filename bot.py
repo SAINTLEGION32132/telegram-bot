@@ -27,7 +27,7 @@ if sys.platform == 'win32':
 logging.basicConfig(level=logging.INFO)
 
 # 🔑 Твой токен от @BotFather
-BOT_TOKEN = "8725774318:AAFeU98t4669xvRf21eeUmxAqyog-ExM0Fo"
+BOT_TOKEN = "8725774318:AAEQ-rxZD2TpZswz16umkG9pnHBenneV8vs"
 
 # 👑 ID Администраторов
 ADMIN_IDS = [8667346615]
