@@ -237,8 +237,8 @@ COUNTRY_MAP = {
 }
 
 MENTORS_DATA = {
-    "aIadin_work": {"username": "aIadin_work", "percent": "15%", "description": "Профессиональный наставник"},
-    "qwertyygod": {"username": "qwertyygod", "percent": "15%", "description": "Профессиональный наставник"}
+    "aIadin_work": {"username": "aIadin_work", "percent": "25%", "description": "Профессиональный наставник"},
+    "qwertyygod": {"username": "qwertyygod", "percent": "25%", "description": "Профессиональный наставник"}
 }
 
 
@@ -273,7 +273,7 @@ def get_top_workers(period: str = "all", limit: int = 10):
     profits = filter_profits_by_period(period)
     workers = {}
     for p in profits:
-        uname = p["username"].lower()  # Приводим к нижнему регистру для точного суммирования
+        uname = p["username"].lower()
         if uname not in workers:
             workers[uname] = {"sum": 0.0, "count": 0, "original_uname": p["username"]}
         workers[uname]["sum"] += p["amount"]
@@ -283,7 +283,6 @@ def get_top_workers(period: str = "all", limit: int = 10):
 
 
 def get_worker_rank(username: str) -> str:
-    """Определяет позицию воркера в общем топе за все время"""
     top_list = get_top_workers("all", limit=100)
     for idx, worker in enumerate(top_list, start=1):
         if worker["original_uname"].lower() == username.lower():
@@ -400,8 +399,8 @@ def get_mentors_list_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="■ @aIadin_work 15%", callback_data="mentor_view_aIadin_work"),
-                InlineKeyboardButton(text="■ @qwertyygod 15%", callback_data="mentor_view_qwertyygod"),
+                InlineKeyboardButton(text="■ @aIadin_work 25%", callback_data="mentor_view_aIadin_work"),
+                InlineKeyboardButton(text="■ @qwertyygod 25%", callback_data="mentor_view_qwertyygod"),
             ],
             [InlineKeyboardButton(text="« Назад", callback_data="main_menu")],
         ]
@@ -557,7 +556,7 @@ def get_mentors_main_text() -> str:
 
 def get_mentor_card_text(mentor_username: str) -> str:
     students, profits, total_sum = get_mentor_stats(mentor_username)
-    data = MENTORS_DATA.get(mentor_username, {"percent": "15%", "description": "Профессиональный наставник"})
+    data = MENTORS_DATA.get(mentor_username, {"percent": "25%", "description": "Профессиональный наставник"})
 
     return (
         f"🎓<b>Информация о Наставнике</b>\n\n"
@@ -574,7 +573,7 @@ def get_mentor_card_text(mentor_username: str) -> str:
 
 def get_my_mentor_text(mentor_username: str) -> str:
     students, profits, total_sum = get_mentor_stats(mentor_username)
-    data = MENTORS_DATA.get(mentor_username, {"percent": "15%", "description": "Профессиональный наставник"})
+    data = MENTORS_DATA.get(mentor_username, {"percent": "25%", "description": "Профессиональный наставник"})
 
     return (
         f"🎓<b>Ваш Наставник</b>\n\n"
